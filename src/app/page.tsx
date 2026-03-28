@@ -139,9 +139,9 @@ export default function ExperiencePage() {
             <div className="h-20" /> {/* Spacer for fixed header */}
 
             <nav className="flex px-6 py-2 bg-surface-container-low overflow-x-auto gap-4 scrollbar-hide">
-                <button className="bg-primary-container text-white rounded-lg px-4 py-2 text-sm font-headline tracking-wide uppercase whitespace-nowrap">
+                <Link href="/" className="bg-primary-container text-white rounded-lg px-4 py-2 text-sm font-headline tracking-wide uppercase whitespace-nowrap">
                     Portal del Paciente
-                </button>
+                </Link>
                 <Link href="/dashboard" className="text-on-surface-variant px-4 py-2 text-sm font-headline tracking-wide uppercase whitespace-nowrap hover:bg-surface-container transition-colors rounded-lg">
                     Portal de Farmacia
                 </Link>

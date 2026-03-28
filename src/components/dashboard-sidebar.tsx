@@ -15,7 +15,7 @@ export function DashboardSidebar({ currentPortal, user }: SidebarProps) {
   return (
     <aside className="fixed left-0 top-0 h-full flex flex-col bg-surface-container-low dark:bg-slate-900 w-64 rounded-r-xl shadow-2xl shadow-blue-900/10 z-40">
       <div className="px-6 py-8">
-        <h1 className="font-headline text-2xl text-primary-brand dark:text-blue-200 font-bold">FarmaGuard</h1>
+        <h1 className="font-headline text-2xl text-primary-brand dark:text-blue-200 font-bold">GoodPills</h1>
       </div>
       <nav className="flex-1 flex flex-col gap-1">
         {/* Inactive Tab */}
@@ -25,7 +25,7 @@ export function DashboardSidebar({ currentPortal, user }: SidebarProps) {
               ? 'bg-primary-container text-white'
               : 'text-on-surface-variant dark:text-slate-300 hover:bg-surface-container dark:hover:bg-slate-800'
           }`}
-          href="#"
+          href="/"
         >
           <span className="material-symbols-outlined">person</span>
           <span className="font-headline text-sm tracking-wide uppercase">Portal del Paciente</span>

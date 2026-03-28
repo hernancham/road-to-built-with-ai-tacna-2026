@@ -95,7 +95,7 @@ export function Chat() {
           <Sparkles className="w-4 h-4 text-primary-foreground" />
         </div>
         <div>
-          <p className="font-semibold text-sm leading-none">FarmaGuard AI</p>
+          <p className="font-semibold text-sm leading-none">GoodPills AI</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             Gemini 2.5 Flash Vision
           </p>
