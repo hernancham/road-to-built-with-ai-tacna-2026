@@ -31,6 +31,16 @@
       "sourceType": "github",
       "computedHash": "e3ba3d760c5f4cc43b02a91fb8924f726c7818f95cc35d79d0a606ca622b72f5"
     },
+    "tanstack-form": {
+      "source": "oakoss/agent-skills",
+      "sourceType": "github",
+      "computedHash": "57cde547071c6513fecf0411eecb93000c65a0778f9986a99553672a0fd09af1"
+    },
+    "tanstack-query": {
+      "source": "oakoss/agent-skills",
+      "sourceType": "github",
+      "computedHash": "f0aa706e8ebdde2a4bae98844cc61d5c2928a64e0150dbb953f287d5d0a26984"
+    },
     "web-design-guidelines": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
