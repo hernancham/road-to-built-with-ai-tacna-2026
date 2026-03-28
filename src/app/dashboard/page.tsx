@@ -4,10 +4,17 @@ import { useState } from 'react';
 import { SecurityValidator } from '@/components/security-validator';
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { createClient } from '@/lib/supabase/client';
 
 export default function DashboardPage() {
   const [pin, setPin] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [patientData, setPatientData] = useState<{name: string, conditions: { label: string }[]} | null>(null);
+  const [dbMedications, setDbMedications] = useState<{ trade_name?: string; dosage?: string; db_info?: { active_ingredient?: string }; is_known?: boolean }[]>([]);
+  const [dbInteractions, setDbInteractions] = useState<{ state?: string; output?: { pairs?: { status: string; medA: string; medB: string; warning_message: string }[]; interactions?: { severity: string; warning_message: string }[] } } | null>(null);
 
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
@@ -30,6 +37,9 @@ export default function DashboardPage() {
     .flatMap((m) => m.parts)
     .filter((p) => p.type === "tool-checkInteractions")
     .pop();
+
+  const activeMedications = dbMedications.length > 0 ? dbMedications : detectedMedications;
+  const activeInteractionsTool = dbInteractions || (lastInteractionsTool as unknown as { state?: string; output?: { pairs?: { status: string; medA: string; medB: string; warning_message: string }[]; interactions?: { severity: string; warning_message: string }[] } }) || null;
 
   const handleImageUpload = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -55,7 +65,34 @@ export default function DashboardPage() {
     sendMessage({ text: `Por favor revisa explícitamente las interacciones de los siguientes medicamentos: ${drugs.join(', ')}` });
   };
 
-
+  const handleSearchClient = async () => {
+    if (!pin || pin.length !== 6) {
+      setSearchError("El PIN debe tener exactamente 6 dígitos.");
+      return;
+    }
+    setIsSearching(true);
+    setSearchError(null);
+    const supabase = createClient();
+    
+    const { data, error: fetchError } = await supabase
+        .from('pharmacy_sessions')
+        .select('*')
+        .eq('pin', pin)
+        .single();
+        
+    setIsSearching(false);
+    if (fetchError || !data) {
+        setSearchError("PIN inválido o expirado");
+        return;
+    }
+    
+    setPatientData({
+        name: data.patient_name || 'Paciente sin nombre',
+        conditions: data.conditions || []
+    });
+    setDbMedications(data.medications || []);
+    setDbInteractions(data.interactions || null);
+  };
   return (
     <>
       {/* Initial State / PIN Search Section */}
@@ -73,12 +110,19 @@ export default function DashboardPage() {
                 onChange={(e) => setPin(e.target.value)}
               />
             </div>
-            <button className="bg-linear-to-br from-primary-brand to-primary-container text-on-primary px-8 py-4 rounded-lg font-bold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-primary-brand/20">
-              <span className="material-symbols-outlined">search</span>
-              Buscar Cliente
+            <button 
+              onClick={handleSearchClient}
+              disabled={isSearching}
+              className="bg-linear-to-br from-primary-brand to-primary-container text-on-primary px-8 py-4 rounded-lg font-bold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-primary-brand/20 disabled:opacity-50">
+              {isSearching ? <span className="material-symbols-outlined animate-spin">cycle</span> : <span className="material-symbols-outlined">search</span>}
+              {isSearching ? "Buscando..." : "Buscar Cliente"}
             </button>
           </div>
-          <p className="mt-4 text-sm text-on-surface-variant dark:text-slate-400 italic">Solicite el PIN de 6 dígitos generado en la App del Paciente</p>
+          {searchError ? (
+              <p className="mt-4 text-sm text-red-500 font-bold">{searchError}</p>
+          ) : (
+              <p className="mt-4 text-sm text-on-surface-variant dark:text-slate-400 italic">Solicite el PIN de 6 dígitos generado en la App del Paciente</p>
+          )}
         </div>
       </section>
 
@@ -94,11 +138,15 @@ export default function DashboardPage() {
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h2 className="font-headline text-3xl font-extrabold text-on-surface dark:text-white">Juan Pérez</h2>
-                  <span className="bg-secondary/10 dark:bg-teal-500/10 text-secondary dark:text-teal-400 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: '"FILL" 1' }}>verified</span>
-                    VÁLIDA
-                  </span>
+                  <h2 className="font-headline text-3xl font-extrabold text-on-surface dark:text-white">
+                      {patientData ? patientData.name : "Ingresa un PIN"}
+                  </h2>
+                  {patientData && (
+                      <span className="bg-secondary/10 dark:bg-teal-500/10 text-secondary dark:text-teal-400 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: '"FILL" 1' }}>verified</span>
+                        VÁLIDA
+                      </span>
+                  )}
                 </div>
                 <div className="flex gap-6 mt-2 text-on-surface-variant dark:text-slate-400 font-medium">
                   <span>45 años</span>
@@ -131,18 +179,14 @@ export default function DashboardPage() {
               <div className="bg-surface-container dark:bg-slate-900 p-6 rounded-xl border border-outline-variant/10 dark:border-slate-800">
                 <p className="text-xs font-label text-on-surface-variant dark:text-slate-400 uppercase tracking-widest mb-4">Condiciones Declaradas & Alergias</p>
                 <div className="flex flex-wrap gap-3">
-                  <span className="bg-tertiary-container/20 dark:bg-red-500/20 text-tertiary dark:text-red-400 px-4 py-2 rounded-full font-bold flex items-center gap-2">
-                    <span className="material-symbols-outlined text-lg">medical_information</span>
-                    Hipertensión
-                  </span>
-                  <span className="bg-tertiary-container/20 dark:bg-red-500/20 text-tertiary dark:text-red-400 px-4 py-2 rounded-full font-bold flex items-center gap-2">
-                    <span className="material-symbols-outlined text-lg">warning</span>
-                    Alergia a la Penicilina
-                  </span>
-                  <span className="bg-secondary-container/30 dark:bg-teal-500/20 text-secondary dark:text-teal-400 px-4 py-2 rounded-full font-bold flex items-center gap-2">
-                    <span className="material-symbols-outlined text-lg">check_circle</span>
-                    Diabetes Tipo 2 (Controlada)
-                  </span>
+                  {patientData && patientData.conditions.length > 0 ? patientData.conditions.map((cond: { label: string }, idx: number) => (
+                      <span key={idx} className="bg-tertiary-container/20 dark:bg-red-500/20 text-tertiary dark:text-red-400 px-4 py-2 rounded-full font-bold flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg">medical_information</span>
+                        {cond.label}
+                      </span>
+                  )) : (
+                      <p className="text-sm text-on-surface-variant dark:text-slate-500 italic">No hay condiciones cargadas o no hay sesión activa.</p>
+                  )}
                 </div>
               </div>
 
@@ -155,8 +199,8 @@ export default function DashboardPage() {
                     </p>
                     {isExtracting && <span className="material-symbols-outlined text-primary-brand animate-spin text-sm">cycle</span>}
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded font-bold ${messages.length > 0 ? 'bg-primary-container text-primary-brand dark:bg-blue-900/40 dark:text-blue-400' : 'bg-surface-container dark:bg-slate-800 text-on-surface-variant dark:text-slate-400'}`}>
-                    {messages.length > 0 ? 'AI VERIFIED' : 'PENDING'}
+                  <span className={`text-xs px-2 py-1 rounded font-bold ${activeMedications.length > 0 ? 'bg-primary-container text-primary-brand dark:bg-blue-900/40 dark:text-blue-400' : 'bg-surface-container dark:bg-slate-800 text-on-surface-variant dark:text-slate-400'}`}>
+                    {activeMedications.length > 0 ? 'AI VERIFIED' : 'PENDING'}
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-6">
@@ -180,7 +224,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="col-span-2 flex flex-col">
                     <div className="flex-1 overflow-auto">
-                        {detectedMedications.length > 0 ? (
+                        {activeMedications.length > 0 ? (
                             <table className="w-full text-sm">
                             <thead>
                                 <tr className="text-outline dark:text-slate-400 border-b border-outline-variant/20 dark:border-slate-800">
@@ -190,7 +234,7 @@ export default function DashboardPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-outline-variant/10 dark:divide-slate-800">
-                                {detectedMedications.map((med: { trade_name?: string; dosage?: string; db_info?: { active_ingredient?: string }; is_known?: boolean }, i: number) => (
+                                {activeMedications.map((med: { trade_name?: string; dosage?: string; db_info?: { active_ingredient?: string }; is_known?: boolean }, i: number) => (
                                     <tr key={i}>
                                         <td className="py-3 font-bold dark:text-white">{med.trade_name}</td>
                                         <td className="py-3 dark:text-slate-300 text-xs">{med.dosage || med.db_info?.active_ingredient || "No reconocido"}</td>
@@ -221,7 +265,7 @@ export default function DashboardPage() {
                             </div>
                         )}
                     </div>
-                    {detectedMedications.length > 0 && (
+                    {activeMedications.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-outline-variant/20 dark:border-slate-800 flex justify-end">
                         <button className="text-primary-container dark:text-blue-400 font-bold text-sm flex items-center gap-2 hover:opacity-80">
                             <span className="material-symbols-outlined text-sm">edit</span> Editar lectura OCR
@@ -240,8 +284,8 @@ export default function DashboardPage() {
           <SecurityValidator 
               onUpload={handleImageUpload} 
               isStreaming={isStreaming} 
-              lastInteractionsTool={(lastInteractionsTool as unknown as { state?: string; output?: { pairs?: { status: string; medA: string; medB: string; warning_message: string }[]; interactions?: { severity: string; warning_message: string }[] } }) || {}}
-              detectedMedications={detectedMedications}
+              lastInteractionsTool={activeInteractionsTool || {}}
+              detectedMedications={activeMedications}
               onManualAdd={handleManualAdd}
               onManualCheck={handleManualCheck}
           />
@@ -255,7 +299,7 @@ export default function DashboardPage() {
             <span className="material-symbols-outlined text-secondary dark:text-teal-400" style={{ fontVariationSettings: '"FILL" 1' }}>shopping_cart_checkout</span>
             <div>
               <p className="text-xs text-on-surface-variant dark:text-slate-400 font-medium">Resumen de Venta</p>
-              <p className="text-lg font-bold text-on-surface dark:text-white">{detectedMedications.length > 0 ? detectedMedications.length : 0} Medicamentos Seleccionados</p>
+              <p className="text-lg font-bold text-on-surface dark:text-white">{activeMedications.length > 0 ? activeMedications.length : 0} Medicamentos Seleccionados</p>
             </div>
           </div>
           <div className="flex gap-4">
