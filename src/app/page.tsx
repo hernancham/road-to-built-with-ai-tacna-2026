@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
+import { createClient } from '@/lib/supabase/client';
 
 export default function ExperiencePage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -13,7 +14,7 @@ export default function ExperiencePage() {
         { id: 'alergia', label: 'Alergia Penicilina', checked: true },
     ]);
 
-    const [pin, setPin] = useState(['4', '2', '9', '1']);
+    const [pin, setPin] = useState(['4', '2', '9', '1', '0', '3']);
     const [timeLeft, setTimeLeft] = useState(300); // 5 mins in seconds
     const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -28,8 +29,10 @@ export default function ExperiencePage() {
         .filter((p) => p.type === "tool-showDetectedMedications")
         .pop();
         
-    // @ts-expect-error AI SDK tool typing
-    const detectedMedications = lastMedicationsTool?.state === "output-available" ? lastMedicationsTool.output.matched : [];
+    const detectedMedications = useMemo(() => {
+        // @ts-expect-error AI SDK tool typing
+        return lastMedicationsTool?.state === "output-available" ? lastMedicationsTool.output.matched : [];
+    }, [lastMedicationsTool]);
 
     const lastInteractionsTool = messages
         .flatMap((m) => m.parts)
@@ -42,6 +45,26 @@ export default function ExperiencePage() {
             return () => clearInterval(timerId);
         }
     }, [timeLeft]);
+
+    useEffect(() => {
+        const syncSession = async () => {
+            const supabase = createClient();
+            const pinStr = pin.join('');
+            const payload = {
+                pin: pinStr,
+                patient_name: 'Juan Pérez (Demo)',
+                conditions: conditions,
+                medications: detectedMedications,
+                interactions: lastInteractionsTool || null,
+                expires_at: new Date(Date.now() + 10 * 60000).toISOString()
+            };
+            
+            await supabase.from('pharmacy_sessions').upsert(payload, { onConflict: 'pin' });
+        };
+        
+        // Sync whenever key state changes
+        syncSession();
+    }, [pin, conditions, detectedMedications, lastInteractionsTool]);
 
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
@@ -65,7 +88,7 @@ export default function ExperiencePage() {
     };
 
     const handleGeneratePin = () => {
-        const newPin = Array.from({length: 4}, () => Math.floor(Math.random() * 10).toString());
+        const newPin = Array.from({length: 6}, () => Math.floor(Math.random() * 10).toString());
         setPin(newPin);
         setTimeLeft(300);
     };
