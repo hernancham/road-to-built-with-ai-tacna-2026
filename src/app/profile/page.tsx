@@ -6,6 +6,7 @@ import { signOut } from "@/lib/supabase/auth-actions";
 import { routes } from "@/lib/routes";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import Link from "next/link";
 
 export default function ProfilePage() {
   const { user, session, isAuthenticated, isLoading } = useAuth();
@@ -77,6 +78,11 @@ export default function ProfilePage() {
       <header className="border-b bg-card sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <h1 className="text-lg font-semibold">Mi Perfil</h1>
+          <nav className="hidden sm:flex items-center gap-3 text-sm text-muted-foreground">
+            <Link href={routes.app.chat} className="hover:text-foreground transition-colors">
+              Chat IA
+            </Link>
+          </nav>
           <ModeToggle />
           <form action={signOut}>
             <button

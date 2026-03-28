@@ -31,6 +31,7 @@ export const routes = {
      */
     dashboard: "/profile",
     profile: "/profile",
+    chat: "/chat",
   },
 
   // ─── Redirecciones semánticas ───────────────────────────────────────────────

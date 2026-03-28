@@ -11,6 +11,11 @@
       "sourceType": "github",
       "computedHash": "afdf97aa7adae2b9a42389ddb67e7418611bbd3d23604cad96c0f3ca194ab14a"
     },
+    "documentation-writer": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "computedHash": "ee53d65b163cd7eb953a930c95841cfe398cc2c0bd24c06508bbaa07c432be35"
+    },
     "nextjs-app-router-patterns": {
       "source": "wshobson/agents",
       "sourceType": "github",
