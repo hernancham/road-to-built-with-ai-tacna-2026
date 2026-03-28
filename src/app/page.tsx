@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/components/providers/auth-provider';
 
 export default function ExperiencePage() {
+    const { user } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [conditions, setConditions] = useState([
         { id: 'hipertension', label: 'Hipertensión', checked: true },
@@ -52,8 +54,8 @@ export default function ExperiencePage() {
             const pinStr = pin.join('');
             const payload = {
                 pin: pinStr,
-                patient_name: 'Juan Pérez (Demo)',
-                conditions: conditions,
+                patient_name: user?.user_metadata?.full_name ?? 'Paciente de Farmacia',
+                conditions: conditions.filter(c => c.checked),
                 medications: detectedMedications,
                 interactions: lastInteractionsTool || null,
                 expires_at: new Date(Date.now() + 10 * 60000).toISOString()
@@ -64,7 +66,7 @@ export default function ExperiencePage() {
         
         // Sync whenever key state changes
         syncSession();
-    }, [pin, conditions, detectedMedications, lastInteractionsTool]);
+    }, [pin, conditions, detectedMedications, lastInteractionsTool, user]);
 
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
@@ -126,14 +128,20 @@ export default function ExperiencePage() {
                     <span className="material-symbols-outlined text-primary-container text-3xl">health_and_safety</span>
                     <span className="text-primary-brand font-extrabold tracking-tighter text-2xl font-headline">GoodPills</span>
                 </div>
-                <div className="h-10 w-10 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        className="h-full w-full object-cover"
-                        alt="professional medical clinician"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuAedAEFivVxEFPnQylPHrApPZKyFwvFKrK1YUNSdRz7BBS6XB9-H5aty5YVCsQelqIYhnVB9nRFYjSR9vJZy3Y5o4v_Iz44kaUNxfOzIcwCsihYLXaL-L1rBLh8T5lQ4ruC1DM4MjkS5swpub0m4ehfF5jAaClvBHobBNNL8Lgg-Q92bEDtURHDmNhyMaYYEIsIw26bQ1YkNyaL8aN5Rcg33kCPH6T_hzmZXrdDJcHZyBKKxGDdxkoD-aySRB5fZVAwGSseMNYHCS9y"
-                    />
-                </div>
+                <Link href="/profile" className="flex items-center justify-center overflow-hidden hover:ring-4 ring-primary-container/20 transition-all active:scale-95 group">
+                    <div className="h-10 w-10 rounded-xl bg-primary-brand text-white flex items-center justify-center text-sm font-bold font-headline shadow-md group-hover:shadow-lg transition-all">
+                        {user ? (
+                            (user.user_metadata?.full_name ?? user.email ?? "?")
+                                .split(" ")
+                                .map((n: string) => n[0])
+                                .slice(0, 2)
+                                .join("")
+                                .toUpperCase()
+                        ) : (
+                            <span className="material-symbols-outlined text-xl">account_circle</span>
+                        )}
+                    </div>
+                </Link>
             </header>
 
             <div className="h-20" /> {/* Spacer for fixed header */}
