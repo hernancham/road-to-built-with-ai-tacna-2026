@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Geist, Geist_Mono, Inter, Manrope } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/theme-provider"
@@ -10,6 +10,11 @@ const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+});
+
+const manrope = Manrope({
+  subsets: ['latin'],
+  variable: '--font-headline',
 });
 
 const geistMono = Geist_Mono({
@@ -30,9 +35,12 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable)}
+      className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable, manrope.variable)}
       suppressHydrationWarning
     >
+      <head>
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+      </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider
             attribute="class"
