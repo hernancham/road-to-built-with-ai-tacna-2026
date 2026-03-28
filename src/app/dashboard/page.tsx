@@ -2,9 +2,59 @@
 
 import { useState } from 'react';
 import { SecurityValidator } from '@/components/security-validator';
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 
 export default function DashboardPage() {
   const [pin, setPin] = useState('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const { messages, sendMessage, status, error } = useChat({
+    transport: new DefaultChatTransport({ api: "/api/chat" }),
+  });
+
+  const isStreaming = status === "streaming" || status === "submitted";
+
+  // Extraer información del stream de mensajes
+  const lastMedicationsTool = messages
+    .flatMap((m) => m.parts)
+    .filter((p) => p.type === "tool-showDetectedMedications")
+    .pop();
+    
+  // @ts-expect-error AI SDK tool typing
+  const detectedMedications = lastMedicationsTool?.state === "output-available" ? lastMedicationsTool.output.matched : [];
+  const isMappingMeds = (lastMedicationsTool as { state?: string })?.state === "input-streaming" || (lastMedicationsTool as { state?: string })?.state === "input-available";
+  const isExtracting = isMappingMeds || (isStreaming && detectedMedications.length === 0);
+
+  const lastInteractionsTool = messages
+    .flatMap((m) => m.parts)
+    .filter((p) => p.type === "tool-checkInteractions")
+    .pop();
+
+  const handleImageUpload = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!file.type.startsWith("image/")) return;
+    
+    // Create local preview
+    const url = URL.createObjectURL(file);
+    setPreviewImage(url);
+
+    // Send to AI
+    sendMessage({
+      text: "Por favor extrae los medicamentos de esta receta médica.",
+      files: files,
+    });
+  };
+
+  const handleManualAdd = (text: string) => {
+    sendMessage({ text: `Agrégalo a la lista para cruzar interacciones: ${text}` });
+  };
+
+  const handleManualCheck = (drugs: string[]) => {
+    sendMessage({ text: `Por favor revisa explícitamente las interacciones de los siguientes medicamentos: ${drugs.join(', ')}` });
+  };
+
 
   return (
     <>
@@ -23,7 +73,7 @@ export default function DashboardPage() {
                 onChange={(e) => setPin(e.target.value)}
               />
             </div>
-            <button className="bg-gradient-to-br from-primary-brand to-primary-container text-on-primary px-8 py-4 rounded-lg font-bold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-primary-brand/20">
+            <button className="bg-linear-to-br from-primary-brand to-primary-container text-on-primary px-8 py-4 rounded-lg font-bold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-primary-brand/20">
               <span className="material-symbols-outlined">search</span>
               Buscar Cliente
             </button>
@@ -36,9 +86,10 @@ export default function DashboardPage() {
       <div className="grid grid-cols-12 gap-8 mb-24">
         {/* Header Card: Customer Profile */}
         <div className="col-span-12">
-          <div className="bg-surface-container-lowest dark:bg-slate-900 p-6 rounded-xl flex items-center justify-between shadow-sm border-l-8 border-secondary dark:border-teal-500 border-y border-r border-outline-variant/10 dark:border-slate-800">
+          <div className="bg-surface-container-lowest dark:bg-slate-900 p-6 rounded-xl flex items-center justify-between shadow-sm border-l-8 border-y border-r border-outline-variant/10 border-l-secondary dark:border-slate-800 dark:border-l-teal-500">
             <div className="flex items-center gap-6">
               <div className="w-20 h-20 rounded-xl overflow-hidden bg-surface-container dark:bg-slate-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="w-full h-full object-cover" alt="Patient" src="https://lh3.googleusercontent.com/aida-public/AB6AXuATz20NI_ml_2Nol5JHldp-7rkFce2CsUwcJ_0kclGn-xDETo8kyxXmuD3sRCNRj1jpf0iAIN4HPCvqn5wnb8U7HwXnSTy6O29TyjgAwqYeUwD21l1sq4Y4-B3ARTxbHzt5-TDRVDj0J21AsyuymcXO-XTrYAgu-d90V59Nt_vrecn-_GQfxhDS7z_U_mwzTRE3tQGiouyNpCw5gJ6F1lEiWFSLvvVSNqaO_2Vx9Ij913vMEn8gZl4WiWxXiAWZ1dleMyPorcrOnatv" />
               </div>
               <div>
@@ -98,45 +149,85 @@ export default function DashboardPage() {
               {/* Receta Actual Card */}
               <div className="bg-surface-container-lowest dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-outline-variant/10 dark:border-slate-800">
                 <div className="flex justify-between items-center mb-6">
-                  <p className="text-xs font-label text-on-surface-variant dark:text-slate-400 uppercase tracking-widest">Receta Actual (ID: #RX-9920)</p>
-                  <span className="text-xs bg-surface-container dark:bg-slate-800 px-2 py-1 rounded font-bold text-on-surface-variant dark:text-slate-400">OCR VERIFIED</span>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-label text-on-surface-variant dark:text-slate-400 uppercase tracking-widest">
+                       Receta Actual {messages.length > 0 ? (isExtracting ? " (Procesando...)" : " (Procesada via IA)") : ""}
+                    </p>
+                    {isExtracting && <span className="material-symbols-outlined text-primary-brand animate-spin text-sm">cycle</span>}
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded font-bold ${messages.length > 0 ? 'bg-primary-container text-primary-brand dark:bg-blue-900/40 dark:text-blue-400' : 'bg-surface-container dark:bg-slate-800 text-on-surface-variant dark:text-slate-400'}`}>
+                    {messages.length > 0 ? 'AI VERIFIED' : 'PENDING'}
+                  </span>
                 </div>
                 <div className="grid grid-cols-3 gap-6">
                   <div className="col-span-1">
-                    <div className="relative group cursor-zoom-in rounded-lg overflow-hidden border border-outline-variant/30 dark:border-slate-700">
-                      <img className="w-full h-48 object-cover group-hover:scale-110 transition-transform" alt="Prescription" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBLwleLxcq06uYFWRMPOmKO7Zx6gmM-9_3zlXEO9_4idKbpXLflrLHu3r7r6JQPMX6S4_wZ_WTsh5on3nhS7tT41vmN76CVDvsuoyXyST29kNJRyw5gPClxKt4iYGo5NweYhUXpAgLoZbH-fOxigoUaGTKDfF8IE0lS9i79PTQ7ectV7RpvwCUJbf1RKMcmK0IdBNC908pld4dtIeO4oFqLvqjWPyuc0RYfP5a7jt4ixYmgCKOnz4Y9L8aRdLVYU1UtPoqiydbO_CTw" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                        <span className="material-symbols-outlined text-white text-3xl">zoom_in</span>
-                      </div>
+                    <div className="relative group cursor-zoom-in rounded-lg overflow-hidden border border-outline-variant/30 dark:border-slate-700 bg-surface-container dark:bg-slate-800 flex items-center justify-center h-48">
+                      {previewImage ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img className="w-full h-full object-cover group-hover:scale-110 transition-transform" alt="Prescription" src={previewImage} />
+                      ) : (
+                         <div className="text-center p-4">
+                           <span className="material-symbols-outlined text-4xl text-outline mb-2">image_search</span>
+                           <p className="text-xs text-outline font-medium">Esperando receta...</p>
+                         </div>
+                      )}
+                      {previewImage && (
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <span className="material-symbols-outlined text-white text-3xl">zoom_in</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="col-span-2">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-outline dark:text-slate-400 border-b border-outline-variant/20 dark:border-slate-800">
-                          <th className="text-left pb-2 font-medium">Medicamento</th>
-                          <th className="text-left pb-2 font-medium">Dosis</th>
-                          <th className="text-right pb-2 font-medium">Cant.</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-outline-variant/10 dark:divide-slate-800">
-                        <tr>
-                          <td className="py-3 font-bold dark:text-white">Enalapril 10mg</td>
-                          <td className="py-3 dark:text-slate-300">1 cada 12hs</td>
-                          <td className="py-3 text-right dark:text-slate-300">30</td>
-                        </tr>
-                        <tr>
-                          <td className="py-3 font-bold dark:text-white">Metformina 850mg</td>
-                          <td className="py-3 dark:text-slate-300">1 con almuerzo</td>
-                          <td className="py-3 text-right dark:text-slate-300">60</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <div className="mt-4 pt-4 border-t border-outline-variant/20 dark:border-slate-800 flex justify-end">
-                      <button className="text-primary-container dark:text-blue-400 font-bold text-sm flex items-center gap-2 hover:opacity-80">
-                        <span className="material-symbols-outlined text-sm">edit</span> Editar lectura OCR
-                      </button>
+                  <div className="col-span-2 flex flex-col">
+                    <div className="flex-1 overflow-auto">
+                        {detectedMedications.length > 0 ? (
+                            <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-outline dark:text-slate-400 border-b border-outline-variant/20 dark:border-slate-800">
+                                <th className="text-left pb-2 font-medium">Medicamento</th>
+                                <th className="text-left pb-2 font-medium">Dosis (Extraída)</th>
+                                <th className="text-center pb-2 font-medium">Validado</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-outline-variant/10 dark:divide-slate-800">
+                                {detectedMedications.map((med: { trade_name?: string; dosage?: string; db_info?: { active_ingredient?: string }; is_known?: boolean }, i: number) => (
+                                    <tr key={i}>
+                                        <td className="py-3 font-bold dark:text-white">{med.trade_name}</td>
+                                        <td className="py-3 dark:text-slate-300 text-xs">{med.dosage || med.db_info?.active_ingredient || "No reconocido"}</td>
+                                        <td className="py-3 text-center dark:text-slate-300">
+                                            {med.is_known ? <span className="material-symbols-outlined text-emerald-500 text-base">check_circle</span> : <span className="material-symbols-outlined text-amber-500 text-base">help</span>}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                            </table>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-on-surface-variant dark:text-slate-500 text-center p-4">
+                               {isExtracting ? (
+                                   <div className="space-y-4">
+                                       <span className="material-symbols-outlined text-4xl animate-pulse text-primary-brand">document_scanner</span>
+                                       <p className="text-sm font-medium">Analizando receta por IA...</p>
+                                       <div className="text-xs text-left text-slate-400 bg-surface-container p-2 rounded max-w-62.5 overflow-hidden whitespace-pre-wrap">
+                                            {messages.filter(m => m.role === 'assistant').pop()?.parts?.filter(p => p.type === 'text').map(p => (p as { text: string }).text).join('\\n') || "Iniciando análisis..."}
+                                       </div>
+                                   </div>
+                               ) : (
+                                   <div className="space-y-4">
+                                       <span className="material-symbols-outlined text-4xl">inventory_2</span>
+                                       <p className="text-sm">Esperando extracción de datos.</p>
+                                       {error && <p className="text-xs text-red-500">Error: {error.message}</p>}
+                                   </div>
+                               )}
+                            </div>
+                        )}
                     </div>
+                    {detectedMedications.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-outline-variant/20 dark:border-slate-800 flex justify-end">
+                        <button className="text-primary-container dark:text-blue-400 font-bold text-sm flex items-center gap-2 hover:opacity-80">
+                            <span className="material-symbols-outlined text-sm">edit</span> Editar lectura OCR
+                        </button>
+                        </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -146,25 +237,32 @@ export default function DashboardPage() {
 
         {/* Column 2: Validador de Seguridad -> New Custom Component */}
         <div className="col-span-12 lg:col-span-5 flex flex-col gap-8">
-          <SecurityValidator />
+          <SecurityValidator 
+              onUpload={handleImageUpload} 
+              isStreaming={isStreaming} 
+              lastInteractionsTool={(lastInteractionsTool as unknown as { state?: string; output?: { pairs?: { status: string; medA: string; medB: string; warning_message: string }[]; interactions?: { severity: string; warning_message: string }[] } }) || {}}
+              detectedMedications={detectedMedications}
+              onManualAdd={handleManualAdd}
+              onManualCheck={handleManualCheck}
+          />
         </div>
       </div>
 
       {/* Sticky Action Bar */}
-      <div className="fixed bottom-8 right-8 left-[calc(16rem+2rem)] z-40">
+      <div className="fixed bottom-8 right-8 left-72 z-40">
         <div className="glass-card dark:bg-slate-900/80 p-4 rounded-2xl shadow-xl border border-white/40 dark:border-slate-700/50 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <span className="material-symbols-outlined text-secondary dark:text-teal-400" style={{ fontVariationSettings: '"FILL" 1' }}>shopping_cart_checkout</span>
             <div>
               <p className="text-xs text-on-surface-variant dark:text-slate-400 font-medium">Resumen de Venta</p>
-              <p className="text-lg font-bold text-on-surface dark:text-white">2 Medicamentos Seleccionados</p>
+              <p className="text-lg font-bold text-on-surface dark:text-white">{detectedMedications.length > 0 ? detectedMedications.length : 0} Medicamentos Seleccionados</p>
             </div>
           </div>
           <div className="flex gap-4">
             <button className="bg-surface-container-high dark:bg-slate-800 text-on-surface dark:text-white px-6 py-3 rounded-lg font-bold hover:bg-surface-container-highest dark:hover:bg-slate-700 transition-colors">
               Cancelar
             </button>
-            <button className="bg-gradient-to-br from-primary-brand to-primary-container text-on-primary px-10 py-3 rounded-lg font-bold shadow-lg shadow-primary-brand/20 hover:opacity-90 active:scale-95 transition-all">
+            <button className="bg-linear-to-br from-primary-brand to-primary-container text-on-primary px-10 py-3 rounded-lg font-bold shadow-lg shadow-primary-brand/20 hover:opacity-90 active:scale-95 transition-all">
               Confirmar & Dispensar
             </button>
           </div>
