@@ -5,10 +5,21 @@ import { SecurityValidator } from '@/components/security-validator';
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/components/providers/auth-provider';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function DashboardPage() {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
   const [pin, setPin] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
   
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -93,6 +104,17 @@ export default function DashboardPage() {
     setDbMedications(data.medications || []);
     setDbInteractions(data.interactions || null);
   };
+  if (isLoading || !isAuthenticated) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-background-dashboard">
+            <div className="flex flex-col items-center gap-4">
+                <span className="material-symbols-outlined text-primary-brand animate-spin text-4xl">health_and_safety</span>
+                <p className="text-primary-brand font-bold animate-pulse">Verificando sesión...</p>
+            </div>
+        </div>
+    );
+  }
+
   return (
     <>
       {/* Initial State / PIN Search Section */}

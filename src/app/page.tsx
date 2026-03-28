@@ -6,10 +6,18 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/components/providers/auth-provider';
+import { useRouter } from 'next/navigation';
 
 export default function ExperiencePage() {
-    const { user } = useAuth();
+    const { user, isAuthenticated, isLoading } = useAuth();
+    const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!isLoading && !isAuthenticated) {
+            router.replace('/login');
+        }
+    }, [isLoading, isAuthenticated, router]);
     const [conditions, setConditions] = useState([
         { id: 'hipertension', label: 'Hipertensión', checked: true },
         { id: 'diabetes', label: 'Diabetes', checked: false },
@@ -119,6 +127,17 @@ export default function ExperiencePage() {
             text: `Por favor analiza las interacciones de los siguientes medicamentos farmacéuticos: ${medsStr}. ${condStr} Dame posibles advertencias o contraindicaciones.`
         });
     };
+
+    if (isLoading || !isAuthenticated) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background-dashboard">
+                <div className="flex flex-col items-center gap-4">
+                    <span className="material-symbols-outlined text-primary-brand animate-spin text-4xl">health_and_safety</span>
+                    <p className="text-primary-brand font-bold animate-pulse">Verificando sesión...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-background-dashboard text-on-background-dashboard min-h-screen pb-24 font-sans">
